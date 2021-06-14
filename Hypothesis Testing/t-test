@@ -1,3 +1,6 @@
+### We will be testing out averages between 2 groups using t-test
+
+
 ## Using the US Population dataset from 1790 to 1970
 data(uspop)
 

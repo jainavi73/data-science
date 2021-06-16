@@ -1,0 +1,21 @@
+## creating groups
+
+Group1 <- c(2,5,10,8,4)
+Group2 <- c(12,15,10,18,14)
+Group3 <- c(22,25,20,28,24)
+
+## creating combined data frame
+combinedtable <- data.frame(cbind(Group1,Group2, Group3))
+
+## stacking groups below one other
+stackedtable <- stack(combinedtable)
+
+## running ANOVA analysis
+analysis <- aov(values ~ ind, data = stackedtable)
+
+## summarizing
+summary(analysis)
+
+## Plotting
+plot(analysis)
+

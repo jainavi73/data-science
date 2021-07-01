@@ -1,0 +1,211 @@
+---
+title: "Time Series Analysis Intro"
+author: "Tom K. Pace"
+date: "7/1/2021"
+output: 
+  html_document:
+    theme: flatly
+    toc: yes
+    toc_float: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(aTSA)
+```
+
+## White Noise Process
+
+A white noise process, $\{\epsilon_t\}$ is a stochastic process that meets the following conditions:
+
+1. $E(\epsilon_t)$ = 0, the process is centered around zero.
+2. $E(\epsilon_t^2) = \sigma^2$, the process has constant variance.
+3. $cov(\epsilon_t, \epsilon_{t-s}) = 0$, none of the realizations are correlated.
+
+White noise processes are important for the understanding of time series data because (among other things) we typically want the error of a time series model to be a white noise process.  We can simulate a white noise process!
+``` {r}
+# Set the random seed for reproducibility
+set.seed(14)
+# Create a white noise process
+white_noise_process_1 <- rnorm(25, sd=10)
+# Create another white noise process
+white_noise_process_2 <- rnorm(25, sd=0.1)
+```
+Now we can plot our processes!
+``` {r}
+# Create plotting region.
+par(mfrow = c(1, 2))
+# Plot first white noise process with a dashed horizontal line at the mean.
+plot.ts(white_noise_process_1)
+abline(h = 0, col = "blue", lty = "dashed")
+# Plot second white noise process with a dashed horizontal line at the mean.
+plot.ts(white_noise_process_2)
+abline(h = 0, col = "blue", lty = "dashed")
+```
+
+We can create a process that is not a white noise process and plot it.
+``` {r}
+# We can add a trend to the white noise process:
+trend  <- c(1:25)/10
+non_white_noise_process = white_noise_process_2 + trend
+# Set up the plot region.
+par(mfrow = c(1, 2))
+# Plot non-white noise process.
+plot.ts(non_white_noise_process)
+# Plot second white noise process with a dashed horizontal line at the mean.
+plot.ts(white_noise_process_2)
+abline(h = 0, col = "blue", lty = "dashed")
+```
+
+Pop quiz!  Are these white noise processes?
+``` {r}
+process_1 <- rnorm(25, mean = 10)
+process_2 <- rnorm(25, sd = 5) + rnorm(25, sd = 0.5)
+# Plot the processes
+par(mfrow = c(1, 2))
+plot.ts(process_1)
+abline(h = 10, col = "blue", lty = "dashed")
+plot.ts(process_2)
+abline(h = 0, col = "blue", lty = "dashed")
+```
+
+## Stationary Processes
+
+There are different types of stationarity but here we will talk about covariance-stationarity.  Many texts use stationarity and covariance-stationarity synonymously.  A stationary process $\{y_t\}$ is a stochastic process that meets the following conditions:
+
+1. $E(y_t)$ = \mu, the process is centered around some mean value.
+2. $E((y_t - \mu)^2) = \sigma^2$, the process has constant variance.
+3. $cov(y_t, y_{t-s}) = \gamma_s$, the realizations have some constant correlation depending on $s$.
+
+Stationary processes are similar to white noise processes but stationary processes can be centered around an arbitrary mean value and the realizations of stationary processes are correlated with some constant correlation.  Pop quiz!  Are the white noise processes we modelled above stationary? 
+
+``` {r}
+# Write a function that will create a process 
+# where the realizations are strongly correlated.
+generate_stationary_process <- function(n, seed=14) {
+  # Set the random seed for reproducibility.
+  set.seed(seed)
+  stationary_process <- c()
+  stationary_process[1] <- rnorm(1)
+  for (i in c(2:n)) {
+    stationary_process[i] <- rnorm(1) + stationary_process[i - 1]/5
+  }
+  return(stationary_process)
+}
+# Use the function to create a process:
+stationary_process <- generate_stationary_process(100)
+# Plot the process:
+plot.ts(stationary_process)
+abline(h = 0, col = "blue", lty = "dashed")
+```
+One of the ways we can examine a stochastic process is to calculate the Autocorrelation Function (ACF).  The ACF is a measure of how much the process is correlated with itself.  For example, does a realization $y_t$ depend on a previous value $y_{t-s}$ where $s$ is some lag.  The stationary process we created is correlated whereas the white noise processes are not.  We can visualize this by calculating the ACF for each process.
+``` {r}
+# Generate a new white noise process with the same number of realizations.
+white_noise_process_3 <- rnorm(100)
+# Plot the ACFs for each process.
+par(mfrow = c(1, 2))
+acf(stationary_process)
+acf(white_noise_process_3)
+```
+One of the (many) reasons that stationarity matters is that we require processes to be stationary to model them with Moving Average (MA) or Auto-Regressive (AR) models.  There are a variety of ways to test if something is stationary but probably the most common method is the Dicker-Fuller test.  We can create a process that we know is not stationary and then perform the test on the processes we have created.
+``` {r}
+# We can take the cumulative sum of a random normal process 
+# to create a random walk.
+non_stationary_process <- cumsum(rnorm(n=100))
+# Plot this non-stationary process.
+plot.ts(non_stationary_process)
+```
+Now we can test these processes for stationarity using a Dickey-Fuller test.  The null hypothesis for the Dickey-Fuller test is that the process is non-stationary and the alternative hypothesis is that the process is stationary.
+``` {r}
+# Perform the test on the non-stationary process:
+adf.test(non_stationary_process)
+# Perform the test on the stationary process:
+adf.test(stationary_process)
+```
+## Moving Average Models
+Now we can start to model the processes. The simplest type of model for time series data may be the Moving Average model.  A moving average model of order $q$ for a process $\{y_t\}$ is defined as $$y_t = \beta_0 + \sum_{i=0}^q \beta_i \epsilon_{t - i}$$ where the process is centered around some mean value $\beta_0$.  We can estimate a MA(1) model for the stationary process we created.
+``` {r}
+# Fit a model to our stationary process.
+ma_model <- arima(stationary_process, order = c(0,0,1))
+ma_model
+```
+We can look at the model compared to the actual values to see how well they compare.
+``` {r}
+# Create the predictions by using the model residuals.
+ma_model_predictions <- stationary_process - residuals(ma_model)
+# Plot them together:
+plot.ts(stationary_process)
+points(ma_model_predictions, type = "l", col = 2, lty = 2)
+```
+
+## Autoregressive Models
+Autoregressive models are probably the next most simple time series model.  Instead of calculating a moving average like MA models, autoregressive models are based on the previous values of the process.  Specifically, an AutoRegressive (AR) model of order $p$ is defined as $$y_t = \alpha_0 + \sum_{i=0}^p \alpha_i y_{t - i}$$ where the process is centered around some mean value $\alpha_0$.  We can estimate an AR(1) model for our stationary process.
+``` {r}
+# Fit a model to our stationary process.
+ar_model <- arima(stationary_process, order = c(1,0,0))
+ar_model
+```
+Just like with the MA(1) model, we can look at the predictions to compare how well the model predicted the process.
+``` {r}
+# Create the predictions by using the model residuals.
+ar_model_predictions <- stationary_process - residuals(ar_model)
+# Plot them together:
+plot.ts(stationary_process)
+points(ar_model_predictions, type = "l", col = 2, lty = 2)
+```
+
+## Autoregressive Moving Average Models
+It would be very natural to wonder if you could combine an autoregressive model and a moving average model.  Of course, you can and when you do the resulting model is called an AutoRegressive Moving Average (ARMA) model.  An ARMA model is simply a combination of the AR and MA models and an ARMA model of order $(p, q)$ is defined as $$y_t = \alpha_0 + \sum_{i=0}^p \alpha_i y_{t - i} + \sum_{i=0}^q \beta_i \epsilon_{t - i}$$.  Just like the MA and AR models, we can estimate and AR(1,1) model for our stationary process.
+``` {r}
+arma_model <- arima(stationary_process, order = c(1,0,1))
+arma_model
+```
+And we can look at the predictions to compare how well they fit the data.
+``` {r}
+# Create the predictions by using the model residuals.
+arma_model_predictions <- stationary_process - residuals(arma_model)
+# Plot them together:
+plot.ts(stationary_process)
+points(arma_model_predictions, type = "l", col = 2, lty = 2)
+```
+
+The model looks like it is fitting the data better and we can improve the fit by adjusting the order of the model.  For example, we can fit an ARMA(10,10) model:
+``` {r}
+arma_model_10 <- arima(stationary_process, order = c(10,0,10))
+arma_model_10
+```
+And we can look at the predictions to compare how well they fit the data.
+``` {r}
+# Create the predictions by using the model residuals.
+arma_model_10_predictions <- stationary_process - residuals(arma_model_10)
+# Plot them together:
+plot.ts(stationary_process)
+points(arma_model_10_predictions, type = "l", col = 2, lty = 2)
+```
+
+## Autoregressive Integrated Moving Average Models
+You may be asking yourself, "Wow, this is great but why would I care about these ARIMA models when ARMA models are so amazing?"  The answer revolves around the issue of stationarity.  Recall that in order to use an ARMA model, we assume that the underlying process is stationary.  Let us revisit the non-stationary process that we created:
+``` {r}
+# Plot this non-stationary process.
+plot.ts(non_stationary_process)
+```
+
+This is a non-stationary random walk process but what if we create a new stochastic process that is the difference between realizations of this process.  For example, we could create a new process $\{x_t\} = \{y_t - y_{t-1}\}$ so this new process $\{x_t\}$ is the first difference of the original process $\{y_t\}$.  We can look at the two processes side by side.
+``` {r}
+# Create first difference of the non-stationary process.
+diff_non_stationary_process <- diff(non_stationary_process)
+# Create plotting region.
+par(mfrow = c(1, 2))
+plot.ts(non_stationary_process)
+plot.ts(diff_non_stationary_process)
+```
+
+The differenced process appears to be stationary but we can check it with a good ol' Dickey-Fuller test:
+``` {r}
+adf.test(diff_non_stationary_process)
+```
+The test concludes that the new process is stationary.  The I in ARIMA refers to the order of integration in the process or the degree of differencing that must be applied in order to generate a stationary process.  We can now estimate an ARIMA model on the non-stationary process by applying a difference.
+``` {r}
+arima_model <- arima(non_stationary_process, order = c(1,1,1))
+arima_model
+```
